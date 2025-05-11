@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # MongoDB database
+  mongodb:
+    image: mongo:latest
+    container_name: manim-ai-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USERNAME:-root}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD:-example}
+    networks:
+      - manim_network
+    restart: unless-stopped
+
+  # Backend Python Flask service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: manim-ai-backend
+    user: root  # Run as root to avoid permission issues
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USERNAME:-root}:${MONGO_PASSWORD:-example}@mongodb:27017/manim_ai_videos?authSource=admin
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your_super_secret_key}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - FLASK_DEBUG=${FLASK_DEBUG:-0}
+      # Cloudflare R2 environment variables
+      - CLOUDFLARE_R2_ACCESS_KEY_ID=${CLOUDFLARE_R2_ACCESS_KEY_ID}
+      - CLOUDFLARE_R2_SECRET_ACCESS_KEY=${CLOUDFLARE_R2_SECRET_ACCESS_KEY}
+      - CLOUDFLARE_R2_BUCKET_NAME=${CLOUDFLARE_R2_BUCKET_NAME}
+      - CLOUDFLARE_R2_ENDPOINT=${CLOUDFLARE_R2_ENDPOINT}
+      - CLOUDFLARE_R2_PUBLIC_URL=${CLOUDFLARE_R2_PUBLIC_URL}
+    volumes:
+      - ./backend:/app:rw
+      - manim_videos:/app/videos:rw  # Explicitly set as read-write
+    networks:
+      - manim_network
+    restart: unless-stopped
+
+  # Frontend Next.js service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: manim-ai-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5000}
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - manim_network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  manim_videos:
+
+networks:
+  manim_network:
+    driver: bridge
