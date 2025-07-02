@@ -8,6 +8,7 @@ load_dotenv()
 
 # Set OpenAI API key from environment variable
 api_key = os.environ.get("OPENAI_API_KEY")
+print(f"OpenAI API Key: {api_key}")
 if not api_key:
     raise ValueError("OPENAI_API_KEY environment variable is not set. Please set it in your .env file or environment.")
 
